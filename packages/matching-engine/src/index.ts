@@ -11,14 +11,12 @@ import { areTermsEquivalent } from "./synonyms";
 
 export * from "./synonyms";
 
-// Configurable category weights (defaults sum to 100%)
 const DEFAULT_WEIGHTS: Record<string, number> = {
-  MUST_HAVE_SKILL: 30,
-  EXPERIENCE: 20,
+  MUST_HAVE_SKILL: 35,
+  EXPERIENCE: 25,
   RESPONSIBILITY: 20,
-  PREFERRED_SKILL: 15,
+  PREFERRED_SKILL: 10,
   EDUCATION: 5,
-  DOMAIN: 5,
   SOFT_SKILL: 5,
 };
 
@@ -34,46 +32,49 @@ export function runMatchingEngine(
   customWeights: Record<string, number> = DEFAULT_WEIGHTS
 ): MatchEngineResult {
   const evidenceMatrix: EvidenceMapping[] = [];
-  const candidateText = buildCandidateFullText(candidate).toLowerCase();
+  const candidateFullText = buildCandidateFullText(candidate).toLowerCase();
 
-  const categoryMatches: Record<string, { total: number; matched: number; scoreSum: number }> = {};
+  let matchedCount = 0;
+  let totalRequirements = job.requirements.length;
 
-  // Process each JD requirement
+  const categoryStats: Record<string, { total: number; matched: number; scoreSum: number }> = {};
+
   for (const req of job.requirements) {
-    const category = req.category;
-    if (!categoryMatches[category]) {
-      categoryMatches[category] = { total: 0, matched: 0, scoreSum: 0 };
+    const category = req.category || "MUST_HAVE_SKILL";
+    if (!categoryStats[category]) {
+      categoryStats[category] = { total: 0, matched: 0, scoreSum: 0 };
     }
-    categoryMatches[category].total += 1;
+    categoryStats[category].total += 1;
 
     // Search for evidence in candidate profile
-    const evidence = findEvidenceForRequirement(req.exactPhrase, candidate);
+    const evidence = findEvidenceForRequirement(req.exactPhrase, candidate, candidateFullText);
 
     let status: MatchStatus = "MISSING";
     let matchScore = 0;
     let evidenceText = "Not found in resume"; // MANDATORY RULE 2
     let sourceSection = "Not found";
-    let recommendation = `Missing required skill/term "${req.exactPhrase}". Add only if you genuinely have this experience.`;
+    let recommendation = `Missing required skill "${req.exactPhrase}". Add only if you genuinely have this experience.`;
 
     if (evidence.found) {
       matchScore = evidence.strength;
       evidenceText = evidence.text;
       sourceSection = evidence.source;
+      matchedCount++;
 
-      if (evidence.strength >= 85) {
+      if (evidence.strength >= 80) {
         status = "STRONG_MATCH";
-        recommendation = `Strong match found in ${evidence.source}. Maintain evidence clarity.`;
-      } else if (evidence.strength >= 50) {
+        recommendation = `Strong evidence detected in ${evidence.source}. Maintain clear metrics.`;
+      } else if (evidence.strength >= 40) {
         status = "PARTIAL_MATCH";
-        recommendation = `Partial evidence found. Consider elaborating on ${req.exactPhrase} in experience bullets.`;
+        recommendation = `Partial evidence found for "${req.exactPhrase}". Strengthen bullet points if accurate.`;
       } else {
         status = "WEAK_EVIDENCE";
-        recommendation = `Weak evidence. Strengthen evidence with measurable metrics if true.`;
+        recommendation = `Weak evidence. Elaborate on "${req.exactPhrase}" in your experience section if truthful.`;
       }
     }
 
-    categoryMatches[category].matched += evidence.found ? 1 : 0;
-    categoryMatches[category].scoreSum += matchScore;
+    categoryStats[category].matched += evidence.found ? 1 : 0;
+    categoryStats[category].scoreSum += matchScore;
 
     evidenceMatrix.push({
       requirementId: req.id,
@@ -87,55 +88,62 @@ export function runMatchingEngine(
     });
   }
 
-  // Build category score breakdowns
+  // Calculate dynamic category score breakdowns
   const breakdown: CategoryScoreBreakdown[] = [];
   let weightedScoreSum = 0;
-  let totalWeight = 0;
+  let totalWeightSum = 0;
 
   const categoryLabels: Record<string, string> = {
-    MUST_HAVE_SKILL: "Required Skills",
-    EXPERIENCE: "Experience Alignment",
+    MUST_HAVE_SKILL: "Required Hard Skills",
+    EXPERIENCE: "Experience & Role Alignment",
     RESPONSIBILITY: "Responsibilities Alignment",
-    PREFERRED_SKILL: "Technical & Preferred Skills",
+    PREFERRED_SKILL: "Preferred & Technical Tools",
     EDUCATION: "Education & Certifications",
-    DOMAIN: "Domain Alignment",
-    SOFT_SKILL: "Soft Skills",
+    SOFT_SKILL: "Soft Skills & Leadership",
   };
 
   for (const [catKey, weight] of Object.entries(customWeights)) {
-    const stats = categoryMatches[catKey] || { total: 0, matched: 0, scoreSum: 0 };
-    const score = stats.total > 0 ? Math.round(stats.scoreSum / stats.total) : 100;
-    
-    breakdown.push({
-      category: catKey,
-      label: categoryLabels[catKey] || catKey,
-      weightPercentage: weight,
-      score,
-      matchedCount: stats.matched,
-      totalCount: stats.total,
-      details: `${stats.matched} of ${stats.total} requirements matched (${score}% score)`,
-    });
-
-    weightedScoreSum += (score * weight) / 100;
-    totalWeight += weight;
+    const stats = categoryStats[catKey];
+    if (stats && stats.total > 0) {
+      const categoryScore = Math.round(stats.scoreSum / stats.total);
+      breakdown.push({
+        category: catKey,
+        label: categoryLabels[catKey] || catKey,
+        weightPercentage: weight,
+        score: categoryScore,
+        matchedCount: stats.matched,
+        totalCount: stats.total,
+        details: `${stats.matched} of ${stats.total} requirements matched (${categoryScore}%)`,
+      });
+      weightedScoreSum += (categoryScore * weight) / 100;
+      totalWeightSum += weight;
+    }
   }
 
-  const overallMatchScore = Math.min(100, Math.max(0, Math.round((weightedScoreSum / (totalWeight || 100)) * 100)));
+  // Calculate overall match score dynamically (0% to 100%)
+  let overallMatchScore = 0;
+  if (totalRequirements > 0) {
+    if (totalWeightSum > 0) {
+      overallMatchScore = Math.round((weightedScoreSum / totalWeightSum) * 100);
+    } else {
+      overallMatchScore = Math.round((matchedCount / totalRequirements) * 100);
+    }
+  }
+  overallMatchScore = Math.max(0, Math.min(100, overallMatchScore));
 
-  // Critical Gaps
+  // Identify Critical Gaps
   const criticalGaps = evidenceMatrix
-    .filter((e) => e.category === "MUST_HAVE_SKILL" && e.status === "MISSING")
+    .filter((e) => (e.category === "MUST_HAVE_SKILL" || e.category === "EXPERIENCE") && e.status === "MISSING")
     .map((e) => ({
       requirement: e.requirementText,
       foundEvidence: "Not found in resume", // MANDATORY RULE 2
       status: "Review required",
-      actionableFix: `Add ${e.requirementText} evidence only if you genuinely possess this qualification.`,
+      actionableFix: `Add evidence for "${e.requirementText}" only if you genuinely have this experience.`,
     }));
 
   // Keyword Intelligence
   const matchedKeywords: any[] = [];
   const missingKeywords: any[] = [];
-  const underrepresentedKeywords: any[] = [];
 
   for (const item of evidenceMatrix) {
     if (item.status === "STRONG_MATCH" || item.status === "PARTIAL_MATCH") {
@@ -158,7 +166,7 @@ export function runMatchingEngine(
     scoreExplanation: {
       overallMatchScore,
       metricLabel: "Resume–JD Match Score", // MANDATORY RULE 1
-      formulaDescription: "Weighted score = Required Skills (30%) + Experience (20%) + Responsibilities (20%) + Technical Skills (15%) + Education (5%) + Domain (5%) + Soft Skills (5%)",
+      formulaDescription: "Dynamic Weighted Score = Required Skills (35%) + Experience (25%) + Responsibilities (20%) + Technical Tools (10%) + Education (5%) + Soft Skills (5%)",
       breakdown,
       criticalGaps,
       weightings: customWeights,
@@ -167,25 +175,27 @@ export function runMatchingEngine(
     keywordIntelligence: {
       matchedKeywords,
       missingKeywords,
-      underrepresentedKeywords,
+      underrepresentedKeywords: [],
     },
   };
 }
 
 function findEvidenceForRequirement(
   targetTerm: string,
-  candidate: CandidateProfile
+  candidate: CandidateProfile,
+  fullTextLower: string
 ): { found: boolean; text: string; source: string; strength: number } {
-  const targetLower = targetTerm.toLowerCase();
+  const targetLower = targetTerm.toLowerCase().trim();
+  if (!targetLower) return { found: false, text: "Not found in resume", source: "Not found", strength: 0 };
 
   // 1. Direct match in candidate skills list
   for (const skill of candidate.skills) {
-    if (areTermsEquivalent(skill, targetTerm)) {
+    if (areTermsEquivalent(skill, targetTerm) || skill.toLowerCase().includes(targetLower)) {
       return {
         found: true,
-        text: `Skills section contains "${skill}"`,
+        text: `Skills section lists "${skill}"`,
         source: "Skills Section",
-        strength: 90,
+        strength: 95,
       };
     }
   }
@@ -212,7 +222,7 @@ function findEvidenceForRequirement(
         found: true,
         text: `Education: ${edu.degree} at ${edu.institution}`,
         source: "Education Section",
-        strength: 100,
+        strength: 90,
       };
     }
   }
@@ -224,18 +234,28 @@ function findEvidenceForRequirement(
         found: true,
         text: `Certification: "${cert}"`,
         source: "Certifications Section",
-        strength: 100,
+        strength: 95,
       };
     }
   }
 
-  // 5. Match in Summary
-  if (candidate.summary.toLowerCase().includes(targetLower)) {
+  // 5. Direct substring match in summary
+  if (candidate.summary && candidate.summary.toLowerCase().includes(targetLower)) {
     return {
       found: true,
       text: `Summary mentions "${targetTerm}"`,
       source: "Professional Summary",
-      strength: 75,
+      strength: 80,
+    };
+  }
+
+  // 6. Substring match anywhere in candidate full text
+  if (fullTextLower.includes(targetLower)) {
+    return {
+      found: true,
+      text: `Mentioned in candidate profile text`,
+      source: "Resume Content",
+      strength: 60,
     };
   }
 
@@ -249,11 +269,11 @@ function findEvidenceForRequirement(
 
 function buildCandidateFullText(candidate: CandidateProfile): string {
   const parts = [
-    candidate.summary,
-    ...candidate.skills,
-    ...candidate.experience.map((e) => `${e.company} ${e.title} ${e.bullets.join(" ")}`),
-    ...candidate.education.map((e) => `${e.degree} ${e.institution}`),
-    ...candidate.certifications,
+    candidate.summary || "",
+    ...(candidate.skills || []),
+    ...(candidate.experience || []).map((e) => `${e.company} ${e.title} ${(e.bullets || []).join(" ")}`),
+    ...(candidate.education || []).map((e) => `${e.degree} ${e.institution}`),
+    ...(candidate.certifications || []),
   ];
   return parts.join(" ");
 }
