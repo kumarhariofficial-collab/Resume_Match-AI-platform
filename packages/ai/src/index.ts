@@ -1,2 +1,2 @@
-export * from "./anti-hallucination.js";
-export * from "./prompts.js";
+export * from "./anti-hallucination";
+export * from "./prompts";

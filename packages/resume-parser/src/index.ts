@@ -1,13 +1,13 @@
 import { CandidateProfile } from "@resumematch/core-types";
-import { extractTextFromBuffer } from "./text-extractor.js";
-import { extractContactInfo } from "./contact-extractor.js";
-import { detectAndSplitSections } from "./section-detector.js";
-import { parseWorkExperienceSection } from "./experience-parser.js";
+import { extractTextFromBuffer } from "./text-extractor";
+import { extractContactInfo } from "./contact-extractor";
+import { detectAndSplitSections } from "./section-detector";
+import { parseWorkExperienceSection } from "./experience-parser";
 
-export * from "./text-extractor.js";
-export * from "./contact-extractor.js";
-export * from "./section-detector.js";
-export * from "./experience-parser.js";
+export * from "./text-extractor";
+export * from "./contact-extractor";
+export * from "./section-detector";
+export * from "./experience-parser";
 
 export async function parseResumeBuffer(
   buffer: Buffer,

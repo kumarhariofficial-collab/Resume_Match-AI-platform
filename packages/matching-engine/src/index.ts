@@ -7,9 +7,9 @@ import {
   KeywordIntelligence,
   MatchStatus,
 } from "@resumematch/core-types";
-import { areTermsEquivalent } from "./synonyms.js";
+import { areTermsEquivalent } from "./synonyms";
 
-export * from "./synonyms.js";
+export * from "./synonyms";
 
 // Configurable category weights (defaults sum to 100%)
 const DEFAULT_WEIGHTS: Record<string, number> = {
