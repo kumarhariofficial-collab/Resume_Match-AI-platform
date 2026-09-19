@@ -18,19 +18,25 @@ import {
   Layers,
   ArrowRight,
   Lock,
+  XCircle,
+  TrendingUp,
+  Check,
 } from "lucide-react";
 import { ScoreBreakdownModal } from "@/components/analysis/ScoreBreakdownModal";
 import { RequirementMatrixTable } from "@/components/analysis/RequirementMatrixTable";
 import { ATSChecklist } from "@/components/analysis/ATSChecklist";
 import { LoginModal } from "@/components/auth/LoginModal";
+import { PaywallModal } from "@/components/auth/PaywallModal";
 
 export default function AnalysisReportPage() {
   const params = useParams();
   const router = useRouter();
   const [report, setReport] = useState<FullAnalysisReport | null>(null);
-  const [activeTab, setActiveTab] = useState<"matrix" | "ats" | "keywords" | "recs">("matrix");
+  const [activeTab, setActiveTab] = useState<"verdict" | "matrix" | "ats" | "keywords" | "recs">("verdict");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState("Pro Career Intelligence");
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
@@ -56,6 +62,34 @@ export default function AnalysisReportPage() {
   }
 
   const { candidateProfile, jobProfile, scoreExplanation, atsAudit, evidenceMatrix, keywordIntelligence, actionableRecommendations } = report;
+  const matchScore = scoreExplanation.overallMatchScore;
+
+  const getVerdict = () => {
+    if (matchScore >= 80) {
+      return {
+        label: "EXCELLENT MATCH — Highly Qualified Candidate",
+        color: "bg-emerald-500 text-white border-emerald-600",
+        bgBanner: "from-emerald-900 via-teal-900 to-slate-900",
+        description: `Your resume shows strong ${matchScore}% qualification alignment with ${jobProfile.title}. Key required skills like ${keywordIntelligence.matchedKeywords.slice(0, 3).map(k=>k.term).join(", ")} were explicitly detected in your profile.`,
+      };
+    } else if (matchScore >= 50) {
+      return {
+        label: "PARTIAL MATCH — Gaps & Weak Evidence Detected",
+        color: "bg-amber-500 text-white border-amber-600",
+        bgBanner: "from-amber-900 via-orange-900 to-slate-900",
+        description: `Your resume shows moderate ${matchScore}% alignment with ${jobProfile.title}. Some core requirements were missing or weakly supported. Review the steps below to strengthen your evidence.`,
+      };
+    } else {
+      return {
+        label: "CRITICAL GAPS — Significant Revision Required",
+        color: "bg-red-500 text-white border-red-600",
+        bgBanner: "from-red-900 via-rose-900 to-slate-900",
+        description: `Your resume shows low ${matchScore}% alignment with ${jobProfile.title}. Multiple required hard skills were marked as "Not found in resume".`,
+      };
+    }
+  };
+
+  const verdict = getVerdict();
 
   const handleExportDocx = async () => {
     setIsExporting(true);
@@ -81,9 +115,14 @@ export default function AnalysisReportPage() {
     }
   };
 
+  const triggerPaywall = (featureName: string) => {
+    setPaywallFeature(featureName);
+    setIsPaywallOpen(true);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
-      {/* Top Banner Header */}
+      {/* Header Banner */}
       <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-wider">
@@ -106,7 +145,7 @@ export default function AnalysisReportPage() {
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
-            onClick={() => router.push(`/builder/${report.id}`)}
+            onClick={() => triggerPaywall("AI Resume Rewriter & Tailoring")}
             className="flex-1 sm:flex-none px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
           >
             <Sparkles className="w-4 h-4" />
@@ -123,33 +162,25 @@ export default function AnalysisReportPage() {
         </div>
       </div>
 
-      {/* Recommended Action Callout Banner */}
-      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-800">
-        <div className="space-y-2 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-bold uppercase tracking-wider border border-blue-500/30">
-            <Sparkles className="w-4 h-4 text-blue-400" />
-            Recommended Action
+      {/* Match Verdict Banner */}
+      <div className={`bg-gradient-to-r ${verdict.bgBanner} text-white p-6 sm:p-8 rounded-3xl shadow-2xl space-y-4 border border-slate-800`}>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider border bg-white/10 backdrop-blur">
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            Match Verdict Analysis
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold">Tailor Your Resume Specifically to {jobProfile.title}</h2>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-            Align bullet point wording and move required skills higher without inventing experience. Re-validate through the ATS auditor and export the updated DOCX file before applying.
-          </p>
+          <span className={`px-4 py-1.5 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-md ${verdict.color}`}>
+            {verdict.label}
+          </span>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <button
-            onClick={() => router.push(`/builder/${report.id}`)}
-            className="w-full sm:w-auto px-6 py-3.5 bg-blue-500 hover:bg-blue-600 text-white rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-2"
-          >
-            Open Side-by-Side Builder
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
+        <p className="text-sm sm:text-base text-slate-200 leading-relaxed max-w-4xl">
+          {verdict.description}
+        </p>
       </div>
 
-      {/* Executive Metric Cards */}
+      {/* Metric Cards */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Match Score Card */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-lg space-y-3 relative overflow-hidden">
           <div className="flex justify-between items-center">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{scoreExplanation.metricLabel}</span>
@@ -172,7 +203,6 @@ export default function AnalysisReportPage() {
           <p className="text-[11px] text-slate-400 font-medium">Explainable formula based on requirement weights.</p>
         </div>
 
-        {/* ATS Health Card */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-lg space-y-3">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{atsAudit.metricLabel}</span>
           <div className="flex items-baseline justify-between">
@@ -198,7 +228,6 @@ export default function AnalysisReportPage() {
           <p className="text-[11px] text-slate-400 font-medium">11-point layout & text parsing audit.</p>
         </div>
 
-        {/* Critical Gaps Card */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-lg space-y-3">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Critical Gaps</span>
           <div className="text-4xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">
@@ -208,7 +237,6 @@ export default function AnalysisReportPage() {
           <p className="text-[11px] text-slate-400 font-medium">Marked as <em>"Not found in resume"</em>.</p>
         </div>
 
-        {/* Keywords Matched Card */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-lg space-y-3">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Keywords Matched</span>
           <div className="text-4xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">
@@ -219,27 +247,81 @@ export default function AnalysisReportPage() {
         </div>
       </div>
 
-      {/* Premium Perks Card */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-200">
-            <Lock className="w-5 h-5" />
-          </div>
+      {/* Step-by-Step Guidance Timeline */}
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
+        <div className="flex justify-between items-center border-b border-slate-100 pb-4">
           <div>
-            <h3 className="font-bold text-slate-900 text-sm">Sign in to unlock Pro Career Features</h3>
-            <p className="text-xs text-slate-500">Save versions to Job Tracker, generate Cover Letters, and access technical interview prep.</p>
+            <h3 className="text-xl font-extrabold text-slate-900">Recommended Steps to Optimize Resume for {jobProfile.title}</h3>
+            <p className="text-xs text-slate-500">Follow this 5-step roadmap to maximize your interview odds truthfully.</p>
+          </div>
+          <button
+            onClick={() => triggerPaywall("Automated 5-Step Optimization Engine")}
+            className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all flex items-center gap-1.5"
+          >
+            <Lock className="w-3.5 h-3.5" /> Unlock Pro Auto-Apply
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-4">
+            <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">1</div>
+            <div className="space-y-1">
+              <h4 className="font-bold text-slate-900 text-sm">Step 1: Verify Matched Hard Skills</h4>
+              <p className="text-xs text-slate-600">Review your {keywordIntelligence.matchedKeywords.length} matched keywords ({keywordIntelligence.matchedKeywords.map(k=>k.term).slice(0, 4).join(", ")}) in your skills section. Keep these front and center.</p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-4">
+            <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">2</div>
+            <div className="space-y-1">
+              <h4 className="font-bold text-slate-900 text-sm">Step 2: Address Missing & Weak Keywords</h4>
+              <p className="text-xs text-slate-600">Review missing items marked <em>"Not found in resume"</em>. Add keywords like {keywordIntelligence.missingKeywords.map(m=>m.term).slice(0, 3).join(", ")} ONLY if you genuinely possess hands-on experience.</p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-4">
+            <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">3</div>
+            <div className="space-y-1">
+              <h4 className="font-bold text-slate-900 text-sm">Step 3: Fix ATS Layout & Parsing Health Risks</h4>
+              <p className="text-xs text-slate-600">Your ATS Readability score is {atsAudit.atsHealthScore}%. Ensure contact details, email, and section headings use conventional single-column formatting.</p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-4">
+            <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">4</div>
+            <div className="space-y-1">
+              <h4 className="font-bold text-slate-900 text-sm">Step 4: Tailor Experience Bullet Points</h4>
+              <p className="text-xs text-slate-600">Rephrase your work experience bullet points to emphasize action verbs and measurable business outcomes (e.g. "Automated weekly reporting by 40%").</p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-4">
+            <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">5</div>
+            <div className="space-y-1">
+              <h4 className="font-bold text-slate-900 text-sm">Step 5: Export Re-Validated ATS DOCX / PDF</h4>
+              <p className="text-xs text-slate-600">Download the updated, re-validated resume document. The server automatically re-parses exported files to guarantee zero content loss.</p>
+              <button
+                onClick={handleExportDocx}
+                disabled={isExporting}
+                className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" /> Download Updated DOCX
+              </button>
+            </div>
           </div>
         </div>
-        <button
-          onClick={() => setIsLoginOpen(true)}
-          className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-md"
-        >
-          Sign In / Upgrade
-        </button>
       </div>
 
       {/* Tabs Navigation */}
       <div className="border-b border-slate-200 flex gap-6 text-sm font-bold text-slate-600 overflow-x-auto pb-1">
+        <button
+          onClick={() => setActiveTab("verdict")}
+          className={`pb-3 border-b-2 transition-all whitespace-nowrap ${
+            activeTab === "verdict" ? "border-blue-600 text-blue-600" : "border-transparent hover:text-slate-900"
+          }`}
+        >
+          Match Verdict Analysis
+        </button>
         <button
           onClick={() => setActiveTab("matrix")}
           className={`pb-3 border-b-2 transition-all whitespace-nowrap ${
@@ -275,6 +357,39 @@ export default function AnalysisReportPage() {
       </div>
 
       {/* Active Tab Content */}
+      {activeTab === "verdict" && (
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
+          <h3 className="font-extrabold text-slate-900 text-xl">Detailed Verdict Breakdown</h3>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Your profile was evaluated against {jobProfile.requirements.length} extracted job description criteria across hard skills, technical tools, responsibilities, and experience length.
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="p-5 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-2">
+              <div className="font-bold text-emerald-900 text-sm flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Key Strengths ({keywordIntelligence.matchedKeywords.length})
+              </div>
+              <ul className="text-xs text-slate-700 space-y-1">
+                {keywordIntelligence.matchedKeywords.map((k) => (
+                  <li key={k.term} className="flex items-center gap-1.5">✓ {k.term}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="p-5 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-2">
+              <div className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-amber-600" /> Evidence Gaps ({keywordIntelligence.missingKeywords.length})
+              </div>
+              <ul className="text-xs text-slate-700 space-y-1">
+                {keywordIntelligence.missingKeywords.map((m) => (
+                  <li key={m.term} className="flex items-center gap-1.5">⚠ {m.term} — <em>Not found in resume</em></li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === "matrix" && <RequirementMatrixTable evidenceMatrix={evidenceMatrix} />}
       {activeTab === "ats" && <ATSChecklist atsAudit={atsAudit} />}
 
@@ -348,6 +463,12 @@ export default function AnalysisReportPage() {
       <LoginModal
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
+      />
+
+      <PaywallModal
+        isOpen={isPaywallOpen}
+        onClose={() => setIsPaywallOpen(false)}
+        featureTitle={paywallFeature}
       />
     </div>
   );
