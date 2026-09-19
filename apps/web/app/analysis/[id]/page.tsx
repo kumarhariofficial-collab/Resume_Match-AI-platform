@@ -17,10 +17,12 @@ import {
   Briefcase,
   Layers,
   ArrowRight,
+  Lock,
 } from "lucide-react";
 import { ScoreBreakdownModal } from "@/components/analysis/ScoreBreakdownModal";
 import { RequirementMatrixTable } from "@/components/analysis/RequirementMatrixTable";
 import { ATSChecklist } from "@/components/analysis/ATSChecklist";
+import { LoginModal } from "@/components/auth/LoginModal";
 
 export default function AnalysisReportPage() {
   const params = useParams();
@@ -28,6 +30,7 @@ export default function AnalysisReportPage() {
   const [report, setReport] = useState<FullAnalysisReport | null>(null);
   const [activeTab, setActiveTab] = useState<"matrix" | "ats" | "keywords" | "recs">("matrix");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
@@ -85,7 +88,7 @@ export default function AnalysisReportPage() {
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-wider">
             <span className="px-2.5 py-0.5 bg-blue-50 border border-blue-200 rounded-full">
-              Verified Analysis Report
+              Verified Intelligence Report
             </span>
             <span>• {new Date(report.createdAt).toLocaleDateString()}</span>
           </div>
@@ -107,7 +110,7 @@ export default function AnalysisReportPage() {
             className="flex-1 sm:flex-none px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
           >
             <Sparkles className="w-4 h-4" />
-            Tailor Resume
+            Tailor Resume to JD
           </button>
           <button
             onClick={handleExportDocx}
@@ -115,7 +118,31 @@ export default function AnalysisReportPage() {
             className="flex-1 sm:flex-none px-6 py-3 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 rounded-2xl font-semibold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" />
-            {isExporting ? "Validating & Exporting..." : "Export DOCX"}
+            {isExporting ? "Validating & Exporting..." : "Download Updated DOCX"}
+          </button>
+        </div>
+      </div>
+
+      {/* Recommended Action Callout Banner */}
+      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-800">
+        <div className="space-y-2 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-bold uppercase tracking-wider border border-blue-500/30">
+            <Sparkles className="w-4 h-4 text-blue-400" />
+            Recommended Action
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold">Tailor Your Resume Specifically to {jobProfile.title}</h2>
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            Align bullet point wording and move required skills higher without inventing experience. Re-validate through the ATS auditor and export the updated DOCX file before applying.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={() => router.push(`/builder/${report.id}`)}
+            className="w-full sm:w-auto px-6 py-3.5 bg-blue-500 hover:bg-blue-600 text-white rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-2"
+          >
+            Open Side-by-Side Builder
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -192,6 +219,25 @@ export default function AnalysisReportPage() {
         </div>
       </div>
 
+      {/* Premium Perks Card */}
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-200">
+            <Lock className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900 text-sm">Sign in to unlock Pro Career Features</h3>
+            <p className="text-xs text-slate-500">Save versions to Job Tracker, generate Cover Letters, and access technical interview prep.</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setIsLoginOpen(true)}
+          className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-md"
+        >
+          Sign In / Upgrade
+        </button>
+      </div>
+
       {/* Tabs Navigation */}
       <div className="border-b border-slate-200 flex gap-6 text-sm font-bold text-slate-600 overflow-x-auto pb-1">
         <button
@@ -265,7 +311,18 @@ export default function AnalysisReportPage() {
 
       {activeTab === "recs" && (
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
-          <h3 className="font-bold text-slate-900 text-xl">Prioritized Action Plan</h3>
+          <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+            <h3 className="font-bold text-slate-900 text-xl">Prioritized Action Plan</h3>
+            <button
+              onClick={handleExportDocx}
+              disabled={isExporting}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download Updated Resume (DOCX)
+            </button>
+          </div>
+
           <div className="space-y-4">
             {actionableRecommendations.map((rec) => (
               <div key={rec.id} className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
@@ -281,11 +338,16 @@ export default function AnalysisReportPage() {
         </div>
       )}
 
-      {/* Score Breakdown Modal */}
+      {/* Modals */}
       <ScoreBreakdownModal
         scoreExplanation={scoreExplanation}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
       />
     </div>
   );
