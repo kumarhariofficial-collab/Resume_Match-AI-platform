@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, FileText, Sparkles, ArrowRight, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Upload, FileText, Sparkles, ArrowRight, ShieldCheck, Lock, UserCheck } from "lucide-react";
+import { useAuthStore } from "../../lib/auth-store";
+import { LoginModal } from "../../components/auth/LoginModal";
 
 export default function AnalyzePage() {
   const router = useRouter();
+  const { user, isAuthenticated, checkSession } = useAuthStore();
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [resumeText, setResumeText] = useState("");
   const [resumeFileBase64, setResumeFileBase64] = useState<string | null>(null);
   const [fileType, setFileType] = useState<"pdf" | "docx" | "txt">("txt");
@@ -13,6 +17,10 @@ export default function AnalyzePage() {
   const [jobDescription, setJobDescription] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progressStage, setProgressStage] = useState("");
+
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -42,16 +50,7 @@ export default function AnalyzePage() {
     }
   };
 
-  const handleRunAnalysis = async () => {
-    if (!resumeText.trim() && !resumeFileBase64) {
-      alert("Please upload a resume file (PDF, DOCX, TXT) or paste your resume text.");
-      return;
-    }
-    if (!jobDescription.trim()) {
-      alert("Please paste the target Job Description.");
-      return;
-    }
-
+  const executeAnalysis = async (activeUserId?: string) => {
     setIsAnalyzing(true);
     setProgressStage("Extracting text layer & analyzing requirements...");
 
@@ -65,6 +64,7 @@ export default function AnalyzePage() {
           fileType,
           jobDescription,
           fileName: resumeFileName || "Resume",
+          userId: activeUserId || user?.id || "guest",
         }),
       });
 
@@ -83,10 +83,39 @@ export default function AnalyzePage() {
     }
   };
 
+  const handleRunAnalysis = async () => {
+    if (!resumeText.trim() && !resumeFileBase64) {
+      alert("Please upload a resume file (PDF, DOCX, TXT) or paste your resume text.");
+      return;
+    }
+    if (!jobDescription.trim()) {
+      alert("Please paste the target Job Description.");
+      return;
+    }
+
+    // MANDATORY LOGIN GATE CHECK
+    if (!isAuthenticated || !user) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    await executeAnalysis();
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-12 space-y-10">
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        message="Mandatory Login Required: Please sign in with your Gmail or account to execute ATS analysis and track your report."
+        onSuccess={() => {
+          setShowLoginModal(false);
+          executeAnalysis();
+        }}
+      />
+
       <div className="text-center space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-200 text-brand-700 text-xs font-bold uppercase tracking-wider">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-50 border border-brand-200 text-brand-700 text-xs font-bold uppercase tracking-wider">
           <ShieldCheck className="w-4 h-4 text-brand-600" />
           AI & Deterministic ATS Audit Pipeline
         </div>
@@ -96,6 +125,18 @@ export default function AnalyzePage() {
         <p className="text-slate-600 max-w-2xl mx-auto text-sm sm:text-base">
           Upload your PDF, DOCX, or TXT resume and paste the job description to run transparent matching, layout health checks, and evidence mapping.
         </p>
+
+        {user ? (
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-bold text-emerald-800">
+            <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+            Authenticated as <strong>{user.email}</strong> (Scans are tracked in DB)
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-200 rounded-full text-xs font-bold text-amber-800">
+            <Lock className="w-3.5 h-3.5 text-amber-600" />
+            Login Required prior to processing analysis
+          </div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-2 gap-8">

@@ -6,13 +6,9 @@ import { runATSReadabilityAudit } from "@resumematch/ats-auditor";
 import { FullAnalysisReport, CandidateProfile } from "@resumematch/core-types";
 import { PrismaClient } from "@prisma/client";
 
-// Lazy Prisma Singleton to prevent build-time static evaluation errors on Vercel
 let prismaClientInstance: PrismaClient | null = null;
 
 function getPrismaClient(): PrismaClient | null {
-  if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes("dev.db")) {
-    return null;
-  }
   if (!prismaClientInstance) {
     try {
       prismaClientInstance = new PrismaClient();
@@ -27,7 +23,7 @@ function getPrismaClient(): PrismaClient | null {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { resumeText, resumeFileBase64, fileType, jobDescription, fileName } = body;
+    const { resumeText, resumeFileBase64, fileType, jobDescription, fileName, userId, userEmail } = body;
 
     if (!resumeText && !resumeFileBase64) {
       return NextResponse.json(
@@ -92,16 +88,19 @@ export async function POST(req: Request) {
       actionableRecommendations,
     };
 
-    // Save Record to PostgreSQL Database if DATABASE_URL is configured
+    // Save Record to Prisma Database for User & Stats Tracking
     try {
       const db = getPrismaClient();
       if (db) {
+        const targetEmail = userEmail || candidateProfile.candidate.email || "kumarhari.official@gmail.com";
         const user = await db.user.upsert({
-          where: { email: candidateProfile.candidate.email || "guest@resumematch.ai" },
-          update: {},
+          where: { email: targetEmail },
+          update: { updatedAt: new Date() },
           create: {
-            email: candidateProfile.candidate.email || "guest@resumematch.ai",
-            name: candidateProfile.candidate.name || "Guest User",
+            email: targetEmail,
+            name: candidateProfile.candidate.name || targetEmail.split("@")[0],
+            role: "USER",
+            plan: "PRO",
           },
         });
 
@@ -141,7 +140,7 @@ export async function POST(req: Request) {
         });
       }
     } catch (dbErr) {
-      console.warn("Database storage skipped or non-fatal:", dbErr);
+      console.warn("Database storage exception non-fatal:", dbErr);
     }
 
     return NextResponse.json(analysisReport);
