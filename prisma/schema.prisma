@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  role         String        @default("USER")
+  plan         String        @default("FREE")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  resumes      Resume[]
+  jobs         Job[]
+  analyses     Analysis[]
+  applications Application[]
+}
+
+model Resume {
+  id              String          @id @default(cuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  originalFileUrl String?
+  fileType        String
+  parsedText      String
+  structuredJson  String          // Stored JSON string
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  analyses        Analysis[]
+  versions        ResumeVersion[]
+}
+
+model Job {
+  id                 String     @id @default(cuid())
+  userId             String
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company            String
+  title              String
+  url                String?
+  description        String
+  parsedRequirements String     // Stored JSON string
+  createdAt          DateTime   @default(now())
+  analyses           Analysis[]
+}
+
+model Analysis {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resumeId            String
+  resume              Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  jobId               String
+  job                 Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  overallMatchScore   Float
+  atsHealthScore      Float
+  scoreBreakdownJson  String
+  requirementsMatrix  String
+  atsAuditJson        String
+  recommendationsJson String
+  createdAt           DateTime @default(now())
+}
+
+model ResumeVersion {
+  id           String        @id @default(cuid())
+  resumeId     String
+  resume       Resume        @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  versionName  String
+  contentJson  String
+  createdAt    DateTime      @default(now())
+  applications Application[]
+}
+
+model Application {
+  id              String         @id @default(cuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId           String
+  resumeVersionId String?
+  resumeVersion   ResumeVersion? @relation(fields: [resumeVersionId], references: [id])
+  company         String
+  jobTitle        String
+  status          String
+  appliedAt       DateTime?
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@resumematch/export-engine",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@resumematch/ats-auditor": "*",
+    "@resumematch/core-types": "*",
+    "@resumematch/resume-parser": "*",
+    "docx": "^9.1.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
