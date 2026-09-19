@@ -8,8 +8,7 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspaces --if-present",
-    "postinstall": "npx prisma generate || true",
+    "build": "npx prisma generate --schema=./prisma/schema.prisma && npm run build --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "npm run lint --workspaces --if-present",
