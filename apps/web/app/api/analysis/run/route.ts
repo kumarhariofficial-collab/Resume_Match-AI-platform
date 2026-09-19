@@ -6,7 +6,23 @@ import { runATSReadabilityAudit } from "@resumematch/ats-auditor";
 import { FullAnalysisReport, CandidateProfile } from "@resumematch/core-types";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+// Lazy Prisma Singleton to prevent build-time static evaluation errors on Vercel
+let prismaClientInstance: PrismaClient | null = null;
+
+function getPrismaClient(): PrismaClient | null {
+  if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes("dev.db")) {
+    return null;
+  }
+  if (!prismaClientInstance) {
+    try {
+      prismaClientInstance = new PrismaClient();
+    } catch (e) {
+      console.warn("PrismaClient initialization warning:", e);
+      return null;
+    }
+  }
+  return prismaClientInstance;
+}
 
 export async function POST(req: Request) {
   try {
@@ -78,8 +94,9 @@ export async function POST(req: Request) {
 
     // Save Record to PostgreSQL Database if DATABASE_URL is configured
     try {
-      if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("dev.db")) {
-        const user = await prisma.user.upsert({
+      const db = getPrismaClient();
+      if (db) {
+        const user = await db.user.upsert({
           where: { email: candidateProfile.candidate.email || "guest@resumematch.ai" },
           update: {},
           create: {
@@ -88,7 +105,7 @@ export async function POST(req: Request) {
           },
         });
 
-        const dbResume = await prisma.resume.create({
+        const dbResume = await db.resume.create({
           data: {
             userId: user.id,
             title: fileName || "Uploaded Resume",
@@ -98,7 +115,7 @@ export async function POST(req: Request) {
           },
         });
 
-        const dbJob = await prisma.job.create({
+        const dbJob = await db.job.create({
           data: {
             userId: user.id,
             company: jobProfile.company || "Target Company",
@@ -108,7 +125,7 @@ export async function POST(req: Request) {
           },
         });
 
-        await prisma.analysis.create({
+        await db.analysis.create({
           data: {
             id: reportId,
             userId: user.id,
